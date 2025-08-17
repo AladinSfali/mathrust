@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 meval = "0.2"
 regex = "1.5"
+iced = "0.10"
