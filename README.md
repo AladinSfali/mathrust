@@ -66,5 +66,5 @@ You will then be prompted to enter your input.
 To run the GUI application, use the following command:
 
 ```bash
-cargo run --bin gui
+cargo run --bin mathgui
 ```

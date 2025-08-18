@@ -91,6 +91,7 @@ pub enum Calculator {
     Rounding,
     SignificantFigures,
     UpperLowerBounds,
+    EquivalentFraction,
 }
 
 impl Calculator {
@@ -108,6 +109,7 @@ impl Calculator {
         Calculator::Rounding,
         Calculator::SignificantFigures,
         Calculator::UpperLowerBounds,
+        Calculator::EquivalentFraction,
     ];
 
     /// Returns the display name of the calculator.
@@ -125,6 +127,7 @@ impl Calculator {
             Calculator::Rounding => "Rounding",
             Calculator::SignificantFigures => "Significant Figures",
             Calculator::UpperLowerBounds => "Upper and Lower Bounds",
+            Calculator::EquivalentFraction => "Equivalent Fractions",
         }
     }
 }
@@ -192,6 +195,16 @@ struct ProdPrimeFactorState {
     result: Option<String>,
 }
 
+/// State for the Equivalent Fraction calculator.
+#[derive(Debug, Clone, Default)]
+struct EquivalentFractionState {
+    a_input: String,
+    b_input: String,
+    c_input: String,
+    d_input: String,
+    result: Option<f64>,
+}
+
 /// The overall state of our application.
 struct MathGui {
     selected_calculator: Option<Calculator>,
@@ -202,6 +215,7 @@ struct MathGui {
     multiples_state: MultiplesState,
     prime_numbers_state: PrimeNumbersState,
     prod_prime_factor_state: ProdPrimeFactorState,
+    equivalent_fraction_state: EquivalentFractionState,
 }
 
 /// Messages for the BODMAS calculator.
@@ -262,6 +276,17 @@ pub enum ProdPrimeFactorMessage {
     Reset,
 }
 
+/// Messages for the Equivalent Fraction calculator.
+#[derive(Debug, Clone)]
+pub enum EquivalentFractionMessage {
+    AChanged(String),
+    BChanged(String),
+    CChanged(String),
+    DChanged(String),
+    Calculate,
+    Reset,
+}
+
 /// The messages that can be sent to update the state.
 #[derive(Debug, Clone)]
 enum Message {
@@ -274,6 +299,7 @@ enum Message {
     Multiples(MultiplesMessage),
     PrimeNumbers(PrimeNumbersMessage),
     ProdPrimeFactor(ProdPrimeFactorMessage),
+    EquivalentFraction(EquivalentFractionMessage),
 }
 
 // --- Main Application Logic ---
@@ -295,6 +321,7 @@ impl Sandbox for MathGui {
             multiples_state: MultiplesState::default(),
             prime_numbers_state: PrimeNumbersState::default(),
             prod_prime_factor_state: ProdPrimeFactorState::default(),
+            equivalent_fraction_state: EquivalentFractionState::default(),
         }
     }
 
@@ -317,6 +344,7 @@ impl Sandbox for MathGui {
                 self.multiples_state = MultiplesState::default();
                 self.prime_numbers_state = PrimeNumbersState::default();
                 self.prod_prime_factor_state = ProdPrimeFactorState::default();
+                self.equivalent_fraction_state = EquivalentFractionState::default();
             }
             Message::Bodmas(msg) => {
                 let state = &mut self.bodmas_state;
@@ -532,6 +560,72 @@ impl Sandbox for MathGui {
                     }
                 }
             }
+            Message::EquivalentFraction(msg) => {
+                let state = &mut self.equivalent_fraction_state;
+                match msg {
+                    EquivalentFractionMessage::AChanged(value) => {
+                        state.a_input = value;
+                    }
+                    EquivalentFractionMessage::BChanged(value) => {
+                        state.b_input = value;
+                    }
+                    EquivalentFractionMessage::CChanged(value) => {
+                        state.c_input = value;
+                    }
+                    EquivalentFractionMessage::DChanged(value) => {
+                        state.d_input = value;
+                    }
+                    EquivalentFractionMessage::Calculate => {
+                        let a = state.a_input.parse::<f64>();
+                        let b = state.b_input.parse::<f64>();
+                        let c = state.c_input.parse::<f64>();
+                        let d = state.d_input.parse::<f64>();
+
+                        if a.is_err() {
+                            let b_val = b.unwrap_or(0.0);
+                            let c_val = c.unwrap_or(0.0);
+                            let d_val = d.unwrap_or(0.0);
+                            if d_val != 0.0 {
+                                state.result = Some((b_val * c_val) / d_val);
+                            } else {
+                                state.result = None; // Division by zero
+                            }
+                        } else if b.is_err() {
+                            let a_val = a.unwrap_or(0.0);
+                            let c_val = c.unwrap_or(0.0);
+                            let d_val = d.unwrap_or(0.0);
+                            if c_val != 0.0 {
+                                state.result = Some((a_val * d_val) / c_val);
+                            } else {
+                                state.result = None; // Division by zero
+                            }
+                        } else if c.is_err() {
+                            let a_val = a.unwrap_or(0.0);
+                            let b_val = b.unwrap_or(0.0);
+                            let d_val = d.unwrap_or(0.0);
+                            if b_val != 0.0 {
+                                state.result = Some((a_val * d_val) / b_val);
+                            } else {
+                                state.result = None; // Division by zero
+                            }
+                        } else if d.is_err() {
+                            let a_val = a.unwrap_or(0.0);
+                            let b_val = b.unwrap_or(0.0);
+                            let c_val = c.unwrap_or(0.0);
+                            if a_val != 0.0 {
+                                state.result = Some((b_val * c_val) / a_val);
+                            } else {
+                                state.result = None; // Division by zero
+                            }
+                        } else {
+                            state.result = None; // No 'x' found
+                        }
+                    }
+                    EquivalentFractionMessage::Reset => {
+                        *state = EquivalentFractionState::default();
+                    }
+                }
+            }
         }
     }
 
@@ -698,6 +792,39 @@ impl Sandbox for MathGui {
                             button("Reset").on_press(Message::ProdPrimeFactor(
                                 ProdPrimeFactorMessage::Reset
                             )),
+                        ]
+                        .spacing(10),
+                        text(result_text).size(25),
+                        button("Back").on_press(Message::BackToMenu),
+                    ]
+                }
+                Calculator::EquivalentFraction => {
+                    let state = &self.equivalent_fraction_state;
+                    let result_text = match state.result {
+                        Some(res) => format!("Result: {}", res),
+                        None => "Enter three values and 'x' for the unknown.".to_string(),
+                    };
+
+                    column![
+                        text(calculator.name()).size(30),
+                        row![
+                            text_input("a", &state.a_input)
+                                .on_input(|s| Message::EquivalentFraction(EquivalentFractionMessage::AChanged(s))),
+                            text("/"),
+                            text_input("b", &state.b_input)
+                                .on_input(|s| Message::EquivalentFraction(EquivalentFractionMessage::BChanged(s))),
+                            text("="),
+                            text_input("c", &state.c_input)
+                                .on_input(|s| Message::EquivalentFraction(EquivalentFractionMessage::CChanged(s))),
+                            text("/"),
+                            text_input("d", &state.d_input)
+                                .on_input(|s| Message::EquivalentFraction(EquivalentFractionMessage::DChanged(s))),
+                        ]
+                        .spacing(10)
+                        .align_items(Alignment::Center),
+                        row![
+                            button("Calculate").on_press(Message::EquivalentFraction(EquivalentFractionMessage::Calculate)),
+                            button("Reset").on_press(Message::EquivalentFraction(EquivalentFractionMessage::Reset)),
                         ]
                         .spacing(10),
                         text(result_text).size(25),
