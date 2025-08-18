@@ -92,6 +92,9 @@ pub enum Calculator {
     SignificantFigures,
     UpperLowerBounds,
     EquivalentFraction,
+    SimplifyingFractions,
+    MixedNumbers,
+    OrderingFractions,
 }
 
 impl Calculator {
@@ -110,6 +113,9 @@ impl Calculator {
         Calculator::SignificantFigures,
         Calculator::UpperLowerBounds,
         Calculator::EquivalentFraction,
+        Calculator::SimplifyingFractions,
+        Calculator::MixedNumbers,
+        Calculator::OrderingFractions,
     ];
 
     /// Returns the display name of the calculator.
@@ -128,6 +134,9 @@ impl Calculator {
             Calculator::SignificantFigures => "Significant Figures",
             Calculator::UpperLowerBounds => "Upper and Lower Bounds",
             Calculator::EquivalentFraction => "Equivalent Fractions",
+            Calculator::SimplifyingFractions => "Simplifying Fractions",
+            Calculator::MixedNumbers => "Mixed Numbers",
+            Calculator::OrderingFractions => "Ordering Fractions",
         }
     }
 }
@@ -205,6 +214,36 @@ struct EquivalentFractionState {
     result: Option<f64>,
 }
 
+/// State for the Simplifying Fractions calculator.
+#[derive(Debug, Clone, Default)]
+struct SimplifyingFractionsState {
+    numerator_input: String,
+    denominator_input: String,
+    result: Option<String>,
+}
+
+/// State for the Mixed Numbers calculator.
+#[derive(Debug, Clone, Default)]
+struct MixedNumbersState {
+    // For Mixed to Improper
+    whole_input: String,
+    numerator_input: String,
+    denominator_input: String,
+    result_improper: Option<String>,
+
+    // For Improper to Mixed
+    improper_numerator_input: String,
+    improper_denominator_input: String,
+    result_mixed: Option<String>,
+}
+
+/// State for the Ordering Fractions calculator.
+#[derive(Debug, Clone, Default)]
+struct OrderingFractionsState {
+    fractions_input: String,
+    result: Option<String>,
+}
+
 /// The overall state of our application.
 struct MathGui {
     selected_calculator: Option<Calculator>,
@@ -216,6 +255,9 @@ struct MathGui {
     prime_numbers_state: PrimeNumbersState,
     prod_prime_factor_state: ProdPrimeFactorState,
     equivalent_fraction_state: EquivalentFractionState,
+    simplifying_fractions_state: SimplifyingFractionsState,
+    mixed_numbers_state: MixedNumbersState,
+    ordering_fractions_state: OrderingFractionsState,
 }
 
 /// Messages for the BODMAS calculator.
@@ -287,6 +329,36 @@ pub enum EquivalentFractionMessage {
     Reset,
 }
 
+/// Messages for the Simplifying Fractions calculator.
+#[derive(Debug, Clone)]
+pub enum SimplifyingFractionsMessage {
+    NumeratorChanged(String),
+    DenominatorChanged(String),
+    Calculate,
+    Reset,
+}
+
+/// Messages for the Mixed Numbers calculator.
+#[derive(Debug, Clone)]
+pub enum MixedNumbersMessage {
+    WholeChanged(String),
+    NumeratorChanged(String),
+    DenominatorChanged(String),
+    CalculateMixedToImproper,
+    ImproperNumeratorChanged(String),
+    ImproperDenominatorChanged(String),
+    CalculateImproperToMixed,
+    Reset,
+}
+
+/// Messages for the Ordering Fractions calculator.
+#[derive(Debug, Clone)]
+pub enum OrderingFractionsMessage {
+    FractionsInputChanged(String),
+    Calculate,
+    Reset,
+}
+
 /// The messages that can be sent to update the state.
 #[derive(Debug, Clone)]
 enum Message {
@@ -300,6 +372,9 @@ enum Message {
     PrimeNumbers(PrimeNumbersMessage),
     ProdPrimeFactor(ProdPrimeFactorMessage),
     EquivalentFraction(EquivalentFractionMessage),
+    SimplifyingFractions(SimplifyingFractionsMessage),
+    MixedNumbers(MixedNumbersMessage),
+    OrderingFractions(OrderingFractionsMessage),
 }
 
 // --- Main Application Logic ---
@@ -322,6 +397,9 @@ impl Sandbox for MathGui {
             prime_numbers_state: PrimeNumbersState::default(),
             prod_prime_factor_state: ProdPrimeFactorState::default(),
             equivalent_fraction_state: EquivalentFractionState::default(),
+            simplifying_fractions_state: SimplifyingFractionsState::default(),
+            mixed_numbers_state: MixedNumbersState::default(),
+            ordering_fractions_state: OrderingFractionsState::default(),
         }
     }
 
@@ -345,6 +423,9 @@ impl Sandbox for MathGui {
                 self.prime_numbers_state = PrimeNumbersState::default();
                 self.prod_prime_factor_state = ProdPrimeFactorState::default();
                 self.equivalent_fraction_state = EquivalentFractionState::default();
+                self.simplifying_fractions_state = SimplifyingFractionsState::default();
+                self.mixed_numbers_state = MixedNumbersState::default();
+                self.ordering_fractions_state = OrderingFractionsState::default();
             }
             Message::Bodmas(msg) => {
                 let state = &mut self.bodmas_state;
@@ -438,7 +519,8 @@ impl Sandbox for MathGui {
 
                         if numbers.is_empty() {
                             state.result = Some("Please enter valid numbers.".to_string());
-                        } else {
+                        }
+                        else {
                             let result = numbers.iter().fold(1, |acc, &num| lcm(acc, num));
                             state.result = Some(result.to_string());
                         }
@@ -476,7 +558,8 @@ impl Sandbox for MathGui {
                                 let multiples_str: Vec<String> =
                                     multiples.iter().map(|m| m.to_string()).collect();
                                 result_str.push_str(&format!(
-                                    "Multiples of {}: {}\n",
+                                    "Multiples of {}: {}
+",
                                     num,
                                     multiples_str.join(", ")
                                 ));
@@ -626,6 +709,157 @@ impl Sandbox for MathGui {
                     }
                 }
             }
+            Message::SimplifyingFractions(msg) => {
+                let state = &mut self.simplifying_fractions_state;
+                match msg {
+                    SimplifyingFractionsMessage::NumeratorChanged(value) => {
+                        state.numerator_input = value;
+                    }
+                    SimplifyingFractionsMessage::DenominatorChanged(value) => {
+                        state.denominator_input = value;
+                    }
+                    SimplifyingFractionsMessage::Calculate => {
+                        let numerator: Result<u32, _> = state.numerator_input.parse();
+                        let denominator: Result<u32, _> = state.denominator_input.parse();
+
+                        if let (Ok(mut num), Ok(mut den)) = (numerator, denominator) {
+                            if den == 0 {
+                                state.result = Some("Error: Denominator cannot be zero.".to_string());
+                            } else {
+                                let common_factor = hcf(num, den);
+                                num /= common_factor;
+                                den /= common_factor;
+                                state.result = Some(format!("{}/{}", num, den));
+                            }
+                        } else {
+                            state.result = Some("Please enter valid numbers.".to_string());
+                        }
+                    }
+                    SimplifyingFractionsMessage::Reset => {
+                        *state = SimplifyingFractionsState::default();
+                    }
+                }
+            }
+            Message::MixedNumbers(msg) => {
+                let state = &mut self.mixed_numbers_state;
+                match msg {
+                    MixedNumbersMessage::WholeChanged(value) => {
+                        state.whole_input = value;
+                    }
+                    MixedNumbersMessage::NumeratorChanged(value) => {
+                        state.numerator_input = value;
+                    }
+                    MixedNumbersMessage::DenominatorChanged(value) => {
+                        state.denominator_input = value;
+                    }
+                    MixedNumbersMessage::CalculateMixedToImproper => {
+                        let whole: Result<u32, _> = state.whole_input.parse();
+                        let numerator: Result<u32, _> = state.numerator_input.parse();
+                        let denominator: Result<u32, _> = state.denominator_input.parse();
+
+                        if let (Ok(w), Ok(n), Ok(d)) = (whole, numerator, denominator) {
+                            if d == 0 {
+                                state.result_improper = Some("Error: Denominator cannot be zero.".to_string());
+                            } else {
+                                let improper_numerator = w * d + n;
+                                state.result_improper = Some(format!("{}/{}", improper_numerator, d));
+                            }
+                        } else {
+                            state.result_improper = Some("Please enter valid numbers.".to_string());
+                        }
+                    }
+                    MixedNumbersMessage::ImproperNumeratorChanged(value) => {
+                        state.improper_numerator_input = value;
+                    }
+                    MixedNumbersMessage::ImproperDenominatorChanged(value) => {
+                        state.improper_denominator_input = value;
+                    }
+                    MixedNumbersMessage::CalculateImproperToMixed => {
+                        let numerator: Result<u32, _> = state.improper_numerator_input.parse();
+                        let denominator: Result<u32, _> = state.improper_denominator_input.parse();
+
+                        if let (Ok(n), Ok(d)) = (numerator, denominator) {
+                            if d == 0 {
+                                state.result_mixed = Some("Error: Denominator cannot be zero.".to_string());
+                            } else if n < d {
+                                state.result_mixed = Some(format!("{} is not an improper fraction.", format!("{}/{}", n, d)));
+                            } else {
+                                let whole_part = n / d;
+                                let remainder_numerator = n % d;
+                                if remainder_numerator == 0 {
+                                    state.result_mixed = Some(format!("{}", whole_part));
+                                } else {
+                                    state.result_mixed = Some(format!("{}({}/{})", whole_part, remainder_numerator, d));
+                                }
+                            }
+                        } else {
+                            state.result_mixed = Some("Please enter valid numbers.".to_string());
+                        }
+                    }
+                    MixedNumbersMessage::Reset => {
+                        *state = MixedNumbersState::default();
+                    }
+                }
+            }
+            Message::OrderingFractions(msg) => {
+                let state = &mut self.ordering_fractions_state;
+                match msg {
+                    OrderingFractionsMessage::FractionsInputChanged(value) => {
+                        state.fractions_input = value;
+                    }
+                    OrderingFractionsMessage::Calculate => {
+                        let fractions_str: Vec<&str> = state.fractions_input.split(',').collect();
+                        let mut fractions: Vec<(u32, u32)> = Vec::new();
+
+                        for f_str in fractions_str {
+                            let parts: Vec<&str> = f_str.trim().split('/').collect();
+                            if parts.len() == 2 {
+                                if let (Ok(num), Ok(den)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                                    if den == 0 {
+                                        state.result = Some(format!("Error: Denominator cannot be zero for fraction {}.", f_str));
+                                        fractions.clear();
+                                        break;
+                                    }
+                                    fractions.push((num, den));
+                                } else {
+                                    state.result = Some(format!("Error: Invalid number in fraction {}.", f_str));
+                                    fractions.clear();
+                                    break;
+                                }
+                            } else {
+                                state.result = Some(format!("Error: Invalid fraction format {}. Expected numerator/denominator.", f_str));
+                                fractions.clear();
+                                break;
+                            }
+                        }
+
+                        if fractions.is_empty() {
+                            state.result = Some("Please enter valid fractions.".to_string());
+                        }
+                        else {
+                            let mut common_denominator = fractions[0].1;
+                            for i in 1..fractions.len() {
+                                common_denominator = lcm(common_denominator, fractions[i].1);
+                            }
+
+                            let mut result_str = String::new();
+                            result_str.push_str(&format!("Common Denominator: {}
+", common_denominator));
+                            result_str.push_str("Rewritten Fractions:\n");
+
+                            for (num, den) in fractions {
+                                let multiplier = common_denominator / den;
+                                let new_numerator = num * multiplier;
+                                result_str.push_str(&format!("  {}/{} becomes {}/{}\n", num, den, new_numerator, common_denominator));
+                            }
+                            state.result = Some(result_str);
+                        }
+                    }
+                    OrderingFractionsMessage::Reset => {
+                        *state = OrderingFractionsState::default();
+                    }
+                }
+            }
         }
     }
 
@@ -743,7 +977,8 @@ impl Sandbox for MathGui {
                         row![
                             button("Calculate")
                                 .on_press(Message::Multiples(MultiplesMessage::Calculate)),
-                            button("Reset").on_press(Message::Multiples(MultiplesMessage::Reset)),
+                            button("Reset")
+                                .on_press(Message::Multiples(MultiplesMessage::Reset)),
                         ]
                         .spacing(10),
                         text(result_text).size(25),
@@ -825,6 +1060,108 @@ impl Sandbox for MathGui {
                         row![
                             button("Calculate").on_press(Message::EquivalentFraction(EquivalentFractionMessage::Calculate)),
                             button("Reset").on_press(Message::EquivalentFraction(EquivalentFractionMessage::Reset)),
+                        ]
+                        .spacing(10),
+                        text(result_text).size(25),
+                        button("Back").on_press(Message::BackToMenu),
+                    ]
+                }
+                Calculator::SimplifyingFractions => {
+                    let state = &self.simplifying_fractions_state;
+                    let result_text = match &state.result {
+                        Some(res) => format!("Result: {}", res),
+                        None => "Enter numerator and denominator.".to_string(),
+                    };
+
+                    column![
+                        text(calculator.name()).size(30),
+                        row![
+                            text_input("Numerator", &state.numerator_input)
+                                .on_input(|s| Message::SimplifyingFractions(SimplifyingFractionsMessage::NumeratorChanged(s))),
+                            text("/"),
+                            text_input("Denominator", &state.denominator_input)
+                                .on_input(|s| Message::SimplifyingFractions(SimplifyingFractionsMessage::DenominatorChanged(s))),
+                        ]
+                        .spacing(10)
+                        .align_items(Alignment::Center),
+                        row![
+                            button("Calculate").on_press(Message::SimplifyingFractions(SimplifyingFractionsMessage::Calculate)),
+                            button("Reset").on_press(Message::SimplifyingFractions(SimplifyingFractionsMessage::Reset)),
+                        ]
+                        .spacing(10),
+                        text(result_text).size(25),
+                        button("Back").on_press(Message::BackToMenu),
+                    ]
+                }
+                Calculator::MixedNumbers => {
+                    let state = &self.mixed_numbers_state;
+
+                    let mixed_to_improper_result_text = match &state.result_improper {
+                        Some(res) => format!("Improper Fraction: {}", res),
+                        None => "Enter whole number, numerator, and denominator.".to_string(),
+                    };
+
+                    let improper_to_mixed_result_text = match &state.result_mixed {
+                        Some(res) => format!("Mixed Number: {}", res),
+                        None => "Enter improper fraction numerator and denominator.".to_string(),
+                    };
+
+                    column![
+                        text(calculator.name()).size(30),
+                        // Mixed to Improper Section
+                        text("Convert Mixed Number to Improper Fraction").size(20),
+                        row![
+                            text_input("Whole", &state.whole_input)
+                                .on_input(|s| Message::MixedNumbers(MixedNumbersMessage::WholeChanged(s))),
+                            text_input("Numerator", &state.numerator_input)
+                                .on_input(|s| Message::MixedNumbers(MixedNumbersMessage::NumeratorChanged(s))),
+                            text("/"),
+                            text_input("Denominator", &state.denominator_input)
+                                .on_input(|s| Message::MixedNumbers(MixedNumbersMessage::DenominatorChanged(s))),
+                        ]
+                        .spacing(10)
+                        .align_items(Alignment::Center),
+                        row![
+                            button("Calculate Improper").on_press(Message::MixedNumbers(MixedNumbersMessage::CalculateMixedToImproper)),
+                            button("Reset").on_press(Message::MixedNumbers(MixedNumbersMessage::Reset)),
+                        ]
+                        .spacing(10),
+                        text(mixed_to_improper_result_text).size(25),
+
+                        // Improper to Mixed Section
+                        text("Convert Improper Fraction to Mixed Number").size(20),
+                        row![
+                            text_input("Numerator", &state.improper_numerator_input)
+                                .on_input(|s| Message::MixedNumbers(MixedNumbersMessage::ImproperNumeratorChanged(s))),
+                            text("/"),
+                            text_input("Denominator", &state.improper_denominator_input)
+                                .on_input(|s| Message::MixedNumbers(MixedNumbersMessage::ImproperDenominatorChanged(s))),
+                        ]
+                        .spacing(10)
+                        .align_items(Alignment::Center),
+                        row![
+                            button("Calculate Mixed").on_press(Message::MixedNumbers(MixedNumbersMessage::CalculateImproperToMixed)),
+                        ]
+                        .spacing(10),
+                        text(improper_to_mixed_result_text).size(25),
+
+                        button("Back").on_press(Message::BackToMenu),
+                    ]
+                }
+                Calculator::OrderingFractions => {
+                    let state = &self.ordering_fractions_state;
+                    let result_text = match &state.result {
+                        Some(res) => res.clone(),
+                        None => "Enter fractions separated by commas (e.g., 5/6, 3/8).".to_string(),
+                    };
+
+                    column![
+                        text(calculator.name()).size(30),
+                        text_input("Fractions (e.g., 5/6, 3/8)", &state.fractions_input)
+                            .on_input(|s| Message::OrderingFractions(OrderingFractionsMessage::FractionsInputChanged(s))),
+                        row![
+                            button("Calculate").on_press(Message::OrderingFractions(OrderingFractionsMessage::Calculate)),
+                            button("Reset").on_press(Message::OrderingFractions(OrderingFractionsMessage::Reset)),
                         ]
                         .spacing(10),
                         text(result_text).size(25),
