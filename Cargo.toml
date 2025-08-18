@@ -1,7 +1,9 @@
 [package]
 name = "mathrust"
 version = "0.1.0"
+authors = ["MathRust Developer"]
 edition = "2024"
+default-run = "mathgui"
 
 [dependencies]
 meval = "0.2"
